@@ -1,0 +1,64 @@
+{
+  "tables": [
+    {
+      "table": "categories",
+      "columns": [
+        {"name": "id", "type": "INTEGER", "nullable": false, "primary_key": true},
+        {"name": "name", "type": "VARCHAR(100)", "nullable": false, "primary_key": false},
+        {"name": "description", "type": "TEXT", "nullable": true, "primary_key": false}
+      ]
+    },
+    {
+      "table": "products",
+      "columns": [
+        {"name": "id", "type": "INTEGER", "nullable": false, "primary_key": true},
+        {"name": "name", "type": "VARCHAR(200)", "nullable": false, "primary_key": false},
+        {"name": "category_id", "type": "INTEGER", "nullable": true, "primary_key": false},
+        {"name": "price", "type": "FLOAT", "nullable": false, "primary_key": false},
+        {"name": "stock", "type": "INTEGER", "nullable": true, "primary_key": false},
+        {"name": "created_at", "type": "DATETIME", "nullable": true, "primary_key": false}
+      ],
+      "foreign_keys": [
+        {"columns": ["category_id"], "references": "categories.['id']"}
+      ]
+    },
+    {
+      "table": "users",
+      "columns": [
+        {"name": "id", "type": "INTEGER", "nullable": false, "primary_key": true},
+        {"name": "name", "type": "VARCHAR(150)", "nullable": false, "primary_key": false},
+        {"name": "email", "type": "VARCHAR(200)", "nullable": false, "primary_key": false},
+        {"name": "state", "type": "VARCHAR(50)", "nullable": true, "primary_key": false},
+        {"name": "city", "type": "VARCHAR(100)", "nullable": true, "primary_key": false},
+        {"name": "joined_at", "type": "DATETIME", "nullable": true, "primary_key": false}
+      ]
+    },
+    {
+      "table": "orders",
+      "columns": [
+        {"name": "id", "type": "INTEGER", "nullable": false, "primary_key": true},
+        {"name": "user_id", "type": "INTEGER", "nullable": true, "primary_key": false},
+        {"name": "status", "type": "VARCHAR(30)", "nullable": true, "primary_key": false},
+        {"name": "total", "type": "FLOAT", "nullable": false, "primary_key": false},
+        {"name": "created_at", "type": "DATETIME", "nullable": true, "primary_key": false}
+      ],
+      "foreign_keys": [
+        {"columns": ["user_id"], "references": "users.['id']"}
+      ]
+    },
+    {
+      "table": "order_items",
+      "columns": [
+        {"name": "id", "type": "INTEGER", "nullable": false, "primary_key": true},
+        {"name": "order_id", "type": "INTEGER", "nullable": true, "primary_key": false},
+        {"name": "product_id", "type": "INTEGER", "nullable": true, "primary_key": false},
+        {"name": "quantity", "type": "INTEGER", "nullable": false, "primary_key": false},
+        {"name": "unit_price", "type": "FLOAT", "nullable": false, "primary_key": false}
+      ],
+      "foreign_keys": [
+        {"columns": ["order_id"], "references": "orders.['id']"},
+        {"columns": ["product_id"], "references": "products.['id']"}
+      ]
+    }
+  ]
+}
