@@ -7,6 +7,59 @@ from openai import OpenAI
 from .base import LLMProvider, ProviderResponse, ToolUseBlock
 
 
+def _to_openai_messages(messages: list[dict]) -> list[dict]:
+    """Convert Anthropic-format messages to OpenAI format for Ollama."""
+    result = []
+    for msg in messages:
+        role = msg["role"]
+        content = msg["content"]
+
+        # Plain string content — pass through unchanged
+        if isinstance(content, str):
+            result.append({"role": role, "content": content})
+            continue
+
+        # Assistant message — may contain text + tool_use blocks
+        if role == "assistant":
+            text_parts = [b["text"] for b in content if b.get("type") == "text"]
+            tool_uses = [b for b in content if b.get("type") == "tool_use"]
+            openai_msg: dict = {"role": "assistant", "content": " ".join(text_parts) or None}
+            if tool_uses:
+                openai_msg["tool_calls"] = [
+                    {
+                        "id": tu["id"],
+                        "type": "function",
+                        "function": {
+                            "name": tu["name"],
+                            "arguments": json.dumps(tu["input"]),
+                        },
+                    }
+                    for tu in tool_uses
+                ]
+            result.append(openai_msg)
+            continue
+
+        # User message carrying tool results — expand into individual tool messages
+        if role == "user" and isinstance(content, list):
+            tool_results = [b for b in content if b.get("type") == "tool_result"]
+            other = [b for b in content if b.get("type") != "tool_result"]
+            for tr in tool_results:
+                result.append({
+                    "role": "tool",
+                    "tool_call_id": tr["tool_use_id"],
+                    "content": tr["content"] if isinstance(tr["content"], str) else json.dumps(tr["content"]),
+                })
+            if other:
+                text = " ".join(b.get("text", "") for b in other if b.get("type") == "text")
+                if text:
+                    result.append({"role": "user", "content": text})
+            continue
+
+        result.append(msg)
+
+    return result
+
+
 class OllamaProvider(LLMProvider):
     def __init__(self, base_url: str, model: str) -> None:
         # Ollama exposes an OpenAI-compatible API at /v1
@@ -29,9 +82,9 @@ class OllamaProvider(LLMProvider):
         messages: list[dict],
         tools: list[dict],
         system: str,
-        max_tokens: int = 16000,
+        max_tokens: int = 4096,
     ) -> ProviderResponse:
-        full_messages = [{"role": "system", "content": system}] + messages
+        full_messages = [{"role": "system", "content": system}] + _to_openai_messages(messages)
 
         # Convert Anthropic-style tool definitions to OpenAI format
         openai_tools = [
