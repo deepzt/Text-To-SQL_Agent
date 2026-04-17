@@ -12,6 +12,7 @@ structured commit gate with explicit confidence and explanation.
 from __future__ import annotations
 
 import sqlglot
+from sqlglot.errors import ParseError
 
 # ── Tool definition ───────────────────────────────────────────────────────────
 
@@ -63,7 +64,7 @@ def submit_sql_query(
         parsed = sqlglot.parse(sql, dialect=dialect)
         if not parsed:
             syntax_error = "Could not parse SQL — empty parse result."
-    except sqlglot.errors.ParseError as exc:
+    except ParseError as exc:
         syntax_error = str(exc)
 
     return {

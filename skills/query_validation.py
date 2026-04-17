@@ -15,6 +15,7 @@ import re
 
 import sqlglot
 import sqlglot.expressions as exp
+from sqlglot.errors import ParseError
 
 # ── Tool definition ───────────────────────────────────────────────────────────
 
@@ -79,7 +80,7 @@ def validate_sql(
         parsed = sqlglot.parse(sql, dialect=dialect)
         if not parsed:
             issues.append("Syntax error: empty parse result.")
-    except sqlglot.errors.ParseError as exc:
+    except ParseError as exc:
         issues.append(f"Syntax error: {exc}")
         return {"valid": False, "severity": "error", "issues": issues}
     except ValueError:
