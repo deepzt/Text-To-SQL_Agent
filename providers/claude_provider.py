@@ -28,6 +28,7 @@ class ClaudeProvider(LLMProvider):
         system: str,
         max_tokens: int = 4096,
         on_token: Callable[[str], None] | None = None,
+        on_thinking: Callable[[str], None] | None = None,
     ) -> ProviderResponse:
         system_block: list[dict] = [{"type": "text", "text": system}]
         if self._enable_caching:
@@ -46,7 +47,18 @@ class ClaudeProvider(LLMProvider):
         text_parts: list[str] = []
         tool_uses: list[ToolUseBlock] = []
 
-        if on_token:
+        if on_thinking:
+            # Raw event iteration — surfaces both thinking and text deltas separately
+            with self._client.messages.stream(**kwargs) as stream:
+                for event in stream:
+                    if event.type == "content_block_delta":
+                        delta = event.delta
+                        if delta.type == "thinking_delta":
+                            on_thinking(delta.thinking)
+                        elif delta.type == "text_delta" and on_token:
+                            on_token(delta.text)
+            response = stream.get_final_message()
+        elif on_token:
             with self._client.messages.stream(**kwargs) as stream:
                 for text in stream.text_stream:
                     on_token(text)

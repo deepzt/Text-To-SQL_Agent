@@ -85,6 +85,7 @@ class OllamaProvider(LLMProvider):
         system: str,
         max_tokens: int = 4096,
         on_token: Callable[[str], None] | None = None,
+        on_thinking: Callable[[str], None] | None = None,
     ) -> ProviderResponse:
         full_messages = [{"role": "system", "content": system}] + _to_openai_messages(messages)
 

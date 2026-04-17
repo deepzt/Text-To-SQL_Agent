@@ -31,6 +31,7 @@ class LLMProvider(ABC):
         system: str,
         max_tokens: int = 4096,
         on_token: Callable[[str], None] | None = None,
+        on_thinking: Callable[[str], None] | None = None,
     ) -> ProviderResponse:
         """Send a chat request and return a ProviderResponse."""
 

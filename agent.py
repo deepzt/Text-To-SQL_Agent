@@ -74,6 +74,7 @@ class TextToSQLAgent:
         name: str,
         tool_input: dict[str, Any],
         on_status: Callable[[str], None] | None = None,
+        on_thinking: Callable[[str], None] | None = None,
     ) -> dict:
         logger.debug("Tool call: %s | input: %s", name, json.dumps(tool_input)[:200])
 
@@ -108,12 +109,15 @@ class TextToSQLAgent:
         elif name == "validate_sql":
             schema_result = get_schema(self._db)
             known_tables = [t["table"] for t in schema_result.get("schema", [])]
-            return validate_sql(
+            result = validate_sql(
                 sql=tool_input["sql"],
                 dialect=tool_input.get("dialect", "sqlite"),
                 allow_write=Config.ALLOW_WRITE_QUERIES,
                 known_tables=known_tables,
             )
+            if on_status:
+                on_status("validation_result\n" + json.dumps(result))
+            return result
 
         elif name == "execute_sql":
             return execute_sql(
@@ -143,6 +147,7 @@ class TextToSQLAgent:
                 error_message=tool_input["error_message"],
                 attempt_number=attempt,
                 max_attempts=Config.MAX_ERROR_RECOVERY_ATTEMPTS,
+                on_thinking=on_thinking,
             )
 
         elif name == "recall_context":
@@ -159,6 +164,7 @@ class TextToSQLAgent:
         conversation_history: list[dict] | None = None,
         on_status: Callable[[str], None] | None = None,
         on_token: Callable[[str], None] | None = None,
+        on_thinking: Callable[[str], None] | None = None,
     ) -> str:
         self._turn += 1
         messages: list[dict] = list(conversation_history or [])
@@ -176,6 +182,7 @@ class TextToSQLAgent:
                 system=system,
                 max_tokens=4096,
                 on_token=on_token,
+                on_thinking=on_thinking,
             )
 
             if response.stop_reason == "end_turn" and not response.tool_uses:
@@ -203,7 +210,7 @@ class TextToSQLAgent:
             # Execute all tool calls and collect results
             tool_results: list[dict] = []
             for tu in response.tool_uses:
-                result = self._execute_tool(tu.name, tu.input, on_status=on_status)
+                result = self._execute_tool(tu.name, tu.input, on_status=on_status, on_thinking=on_thinking)
                 tool_results.append({
                     "type": "tool_result",
                     "tool_use_id": tu.id,

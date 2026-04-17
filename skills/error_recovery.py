@@ -9,6 +9,8 @@ Max 3 recovery attempts before giving up.
 
 from __future__ import annotations
 
+from typing import Callable
+
 # ── Tool definition ───────────────────────────────────────────────────────────
 
 TOOL_DEFINITION = {
@@ -47,6 +49,7 @@ def recover_from_error(
     error_message: str,
     attempt_number: int,
     max_attempts: int = 3,
+    on_thinking: Callable[[str], None] | None = None,
 ) -> dict:
     """
     Call the LLM provider to diagnose and fix a failing SQL query.
@@ -100,6 +103,7 @@ def recover_from_error(
         tools=[],
         system=system_prompt,
         max_tokens=4096,
+        on_thinking=on_thinking,
     )
 
     import json, re

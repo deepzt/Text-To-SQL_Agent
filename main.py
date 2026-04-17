@@ -10,6 +10,7 @@ Interactive REPL mode (no arguments):
 
 from __future__ import annotations
 
+import json
 import logging
 import sys
 
@@ -30,10 +31,11 @@ logging.basicConfig(
 
 
 class _Display:
-    """Manages interleaved status lines and streamed tokens cleanly."""
+    """Manages interleaved status lines, streamed tokens, and thinking blocks cleanly."""
 
     def __init__(self) -> None:
         self._mid_stream = False
+        self._in_thinking = False
 
     def status(self, msg: str) -> None:
         if self._mid_stream:
@@ -42,14 +44,45 @@ class _Display:
         if msg.startswith("sql\n"):
             sql = msg[4:]
             console.print(Syntax(sql, "sql", theme="monokai", word_wrap=True))
+        elif msg.startswith("validation_result\n"):
+            payload = json.loads(msg[len("validation_result\n"):])
+            self._render_validation(payload)
         else:
             console.print(f"[dim cyan]  › {msg}[/dim cyan]")
 
+    def _render_validation(self, result: dict) -> None:
+        valid = result.get("valid", False)
+        severity = result.get("severity", "ok")
+        issues = result.get("issues", [])
+        status_text = "[bold green]  ✓ Valid[/bold green]" if valid else "[bold red]  ✗ Invalid[/bold red]"
+        severity_colors = {"ok": "green", "warning": "yellow", "error": "red"}
+        color = severity_colors.get(severity, "white")
+        console.print(f"{status_text} [{color}]({severity})[/{color}]")
+        for issue in issues:
+            console.print(f"[yellow]    • {issue}[/yellow]")
+
+    def thinking(self, t: str) -> None:
+        if not self._in_thinking:
+            if self._mid_stream:
+                print()
+            console.print("[dim italic magenta]  ◆ Thinking...[/dim italic magenta]")
+            self._in_thinking = True
+        print(f"\033[2;3;35m{t}\033[0m", end="", flush=True)
+        self._mid_stream = True
+
     def token(self, t: str) -> None:
+        if self._in_thinking:
+            print()
+            console.print("[dim italic magenta]  ◆ End thinking[/dim italic magenta]")
+            self._in_thinking = False
         self._mid_stream = True
         print(t, end="", flush=True)
 
     def finish(self) -> None:
+        if self._in_thinking:
+            print()
+            console.print("[dim italic magenta]  ◆ End thinking[/dim italic magenta]")
+            self._in_thinking = False
         if self._mid_stream:
             print()
             self._mid_stream = False
@@ -62,6 +95,7 @@ def run_query(agent, query: str, history: list[dict]) -> str:
         conversation_history=history,
         on_status=display.status,
         on_token=display.token,
+        on_thinking=display.thinking,
     )
     display.finish()
     return answer
