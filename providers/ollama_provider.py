@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from typing import Callable
 
 from openai import OpenAI
 
@@ -83,10 +84,10 @@ class OllamaProvider(LLMProvider):
         tools: list[dict],
         system: str,
         max_tokens: int = 4096,
+        on_token: Callable[[str], None] | None = None,
     ) -> ProviderResponse:
         full_messages = [{"role": "system", "content": system}] + _to_openai_messages(messages)
 
-        # Convert Anthropic-style tool definitions to OpenAI format
         openai_tools = [
             {
                 "type": "function",
@@ -107,12 +108,44 @@ class OllamaProvider(LLMProvider):
         if openai_tools:
             kwargs["tools"] = openai_tools
 
-        response = self._client.chat.completions.create(**kwargs)
-        choice = response.choices[0]
-        message = choice.message
-
-        text = message.content or ""
         tool_uses: list[ToolUseBlock] = []
+
+        if on_token:
+            # Streaming path — yield text tokens, assemble tool calls from deltas
+            tool_calls_map: dict[int, dict] = {}
+            full_text = ""
+            with self._client.chat.completions.create(**kwargs, stream=True) as stream:
+                for chunk in stream:
+                    delta = chunk.choices[0].delta
+                    if delta.content:
+                        full_text += delta.content
+                        on_token(delta.content)
+                    if delta.tool_calls:
+                        for tc in delta.tool_calls:
+                            idx = tc.index
+                            if idx not in tool_calls_map:
+                                tool_calls_map[idx] = {"id": "", "name": "", "arguments": ""}
+                            if tc.id:
+                                tool_calls_map[idx]["id"] = tc.id
+                            if tc.function and tc.function.name:
+                                tool_calls_map[idx]["name"] += tc.function.name
+                            if tc.function and tc.function.arguments:
+                                tool_calls_map[idx]["arguments"] += tc.function.arguments
+
+            for entry in tool_calls_map.values():
+                try:
+                    args = json.loads(entry["arguments"])
+                except json.JSONDecodeError:
+                    args = {}
+                tool_uses.append(ToolUseBlock(id=entry["id"], name=entry["name"], input=args))
+
+            stop_reason = "tool_use" if tool_uses else "end_turn"
+            return ProviderResponse(content_text=full_text, tool_uses=tool_uses, stop_reason=stop_reason)
+
+        # Non-streaming path (unchanged)
+        response = self._client.chat.completions.create(**kwargs)
+        message = response.choices[0].message
+        text = message.content or ""
 
         if message.tool_calls:
             for tc in message.tool_calls:
@@ -120,15 +153,7 @@ class OllamaProvider(LLMProvider):
                     args = json.loads(tc.function.arguments)
                 except json.JSONDecodeError:
                     args = {}
-                tool_uses.append(
-                    ToolUseBlock(id=tc.id, name=tc.function.name, input=args)
-                )
+                tool_uses.append(ToolUseBlock(id=tc.id, name=tc.function.name, input=args))
 
         stop_reason = "tool_use" if tool_uses else "end_turn"
-
-        return ProviderResponse(
-            content_text=text,
-            tool_uses=tool_uses,
-            stop_reason=stop_reason,
-            raw=response,
-        )
+        return ProviderResponse(content_text=text, tool_uses=tool_uses, stop_reason=stop_reason, raw=response)

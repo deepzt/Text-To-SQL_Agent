@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Callable
 
 
 @dataclass
@@ -29,7 +29,8 @@ class LLMProvider(ABC):
         messages: list[dict],
         tools: list[dict],
         system: str,
-        max_tokens: int = 64000,
+        max_tokens: int = 4096,
+        on_token: Callable[[str], None] | None = None,
     ) -> ProviderResponse:
         """Send a chat request and return a ProviderResponse."""
 

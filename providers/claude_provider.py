@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Callable
+
 import anthropic
 
 from .base import LLMProvider, ProviderResponse, ToolUseBlock
@@ -24,7 +26,8 @@ class ClaudeProvider(LLMProvider):
         messages: list[dict],
         tools: list[dict],
         system: str,
-        max_tokens: int = 16000,
+        max_tokens: int = 4096,
+        on_token: Callable[[str], None] | None = None,
     ) -> ProviderResponse:
         system_block: list[dict] = [{"type": "text", "text": system}]
         if self._enable_caching:
@@ -40,10 +43,16 @@ class ClaudeProvider(LLMProvider):
         if self.supports_thinking:
             kwargs["thinking"] = {"type": "adaptive", "budget_tokens": 8000}
 
-        response = self._client.messages.create(**kwargs)
-
         text_parts: list[str] = []
         tool_uses: list[ToolUseBlock] = []
+
+        if on_token:
+            with self._client.messages.stream(**kwargs) as stream:
+                for text in stream.text_stream:
+                    on_token(text)
+            response = stream.get_final_message()
+        else:
+            response = self._client.messages.create(**kwargs)
 
         for block in response.content:
             if block.type == "text":

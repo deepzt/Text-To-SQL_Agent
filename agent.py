@@ -156,6 +156,7 @@ class TextToSQLAgent:
         user_query: str,
         conversation_history: list[dict] | None = None,
         on_status: Callable[[str], None] | None = None,
+        on_token: Callable[[str], None] | None = None,
     ) -> str:
         self._turn += 1
         messages: list[dict] = list(conversation_history or [])
@@ -172,6 +173,7 @@ class TextToSQLAgent:
                 tools=ALL_TOOLS,
                 system=system,
                 max_tokens=4096,
+                on_token=on_token,
             )
 
             if response.stop_reason == "end_turn" and not response.tool_uses:

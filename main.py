@@ -28,11 +28,38 @@ logging.basicConfig(
 )
 
 
-def run_query(agent, query: str, history: list[dict]) -> str:
-    def show_status(msg: str) -> None:
+class _Display:
+    """Manages interleaved status lines and streamed tokens cleanly."""
+
+    def __init__(self) -> None:
+        self._mid_stream = False
+
+    def status(self, msg: str) -> None:
+        if self._mid_stream:
+            print()
+            self._mid_stream = False
         console.print(f"[dim cyan]  › {msg}[/dim cyan]")
 
-    return agent.run(query, conversation_history=history, on_status=show_status)
+    def token(self, t: str) -> None:
+        self._mid_stream = True
+        print(t, end="", flush=True)
+
+    def finish(self) -> None:
+        if self._mid_stream:
+            print()
+            self._mid_stream = False
+
+
+def run_query(agent, query: str, history: list[dict]) -> str:
+    display = _Display()
+    answer = agent.run(
+        query,
+        conversation_history=history,
+        on_status=display.status,
+        on_token=display.token,
+    )
+    display.finish()
+    return answer
 
 
 def main() -> None:
