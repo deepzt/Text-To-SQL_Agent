@@ -15,7 +15,7 @@ def get_connection(database_url: str):
         return PostgresAdapter(database_url)
     elif url.startswith("mysql"):
         return MySQLAdapter(database_url)
-    elif url.startswith("mssql"):
+    elif url.startswith("mssql") or url.startswith("driver="):
         return MSSQLAdapter(database_url)
     else:
         raise ValueError(f"Unsupported database URL scheme: {database_url}")

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 import time
+import urllib.parse
 
 from sqlalchemy import create_engine, inspect, text
 
@@ -10,6 +11,8 @@ from .sqlite_adapter import ColumnInfo, QueryResult, TableInfo
 
 class MSSQLAdapter:
     def __init__(self, database_url: str) -> None:
+        if database_url.strip().upper().startswith("DRIVER="):
+            database_url = "mssql+pyodbc:///?odbc_connect=" + urllib.parse.quote_plus(database_url)
         self._engine = create_engine(database_url, echo=False)
 
     def test_connection(self) -> bool:

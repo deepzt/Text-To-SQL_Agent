@@ -26,6 +26,9 @@ class Config:
 
     # Database
     DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///db/sample.db")
+    # Raw ODBC connection string for SQL Server
+    # e.g. DRIVER={SQL Server};SERVER=host,port;DATABASE=db;UID=user;PWD=pass
+    MSSQL_CONNECTION_STRING: str = os.getenv("MSSQL_CONNECTION_STRING", "")
 
     # Agent behaviour
     MAX_ROWS_RETURNED: int = int(os.getenv("MAX_ROWS_RETURNED", "100"))

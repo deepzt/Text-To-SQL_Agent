@@ -29,19 +29,20 @@ logger = logging.getLogger(__name__)
 
 class TextToSQLAgent:
     def __init__(self) -> None:
-        self._db = get_connection(Config.DATABASE_URL)
+        db_target = Config.MSSQL_CONNECTION_STRING or Config.DATABASE_URL
+        self._db = get_connection(db_target)
         self._provider = get_provider(Config)
         self._memory = ConversationMemory()
         self._turn = 0
         self._error_attempts: dict[str, int] = {}  # sql -> attempt count
 
         if not self._db.test_connection():
-            raise RuntimeError(f"Cannot connect to database: {Config.DATABASE_URL}")
+            raise RuntimeError(f"Cannot connect to database: {db_target}")
 
         logger.info(
             "TextToSQLAgent ready | provider=%s | db=%s",
             Config.LLM_PROVIDER,
-            Config.DATABASE_URL,
+            db_target,
         )
 
     # ── System prompt ─────────────────────────────────────────────────────────
