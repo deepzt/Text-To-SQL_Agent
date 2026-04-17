@@ -88,6 +88,8 @@ class TextToSQLAgent:
         }
         if on_status and name in _status_labels:
             on_status(_status_labels[name])
+            if name == "submit_sql_query" and "sql" in tool_input:
+                on_status("sql\n" + tool_input["sql"])
 
         if name == "get_schema":
             return get_schema(

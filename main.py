@@ -17,6 +17,7 @@ from rich.console import Console
 from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.prompt import Prompt
+from rich.syntax import Syntax
 
 from config import Config
 
@@ -38,7 +39,11 @@ class _Display:
         if self._mid_stream:
             print()
             self._mid_stream = False
-        console.print(f"[dim cyan]  › {msg}[/dim cyan]")
+        if msg.startswith("sql\n"):
+            sql = msg[4:]
+            console.print(Syntax(sql, "sql", theme="monokai", word_wrap=True))
+        else:
+            console.print(f"[dim cyan]  › {msg}[/dim cyan]")
 
     def token(self, t: str) -> None:
         self._mid_stream = True
