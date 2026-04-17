@@ -8,7 +8,7 @@ from .adapters.mssql_adapter import MSSQLAdapter
 
 def get_connection(database_url: str):
     """Return the correct DB adapter based on the DATABASE_URL scheme."""
-    url = database_url.lower()
+    url = database_url.strip().lower()
     if url.startswith("sqlite"):
         return SQLiteAdapter(database_url)
     elif url.startswith("postgresql") or url.startswith("postgres"):
