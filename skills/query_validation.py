@@ -102,7 +102,7 @@ def validate_sql(
 
     # 4. Schema check (if known_tables provided)
     if known_tables and parsed:
-        for statement in parsed:
+        for statement in filter(None, parsed):
             for table_node in statement.find_all(exp.Table):
                 tname = table_node.name
                 if tname and tname.lower() not in [t.lower() for t in known_tables]:
