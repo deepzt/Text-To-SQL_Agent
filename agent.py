@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any
+from typing import Any, Callable
 
 from config import Config
 from db.connection import get_connection
@@ -67,8 +67,25 @@ class TextToSQLAgent:
 
     # ── Tool dispatcher ───────────────────────────────────────────────────────
 
-    def _execute_tool(self, name: str, tool_input: dict[str, Any]) -> dict:
+    def _execute_tool(
+        self,
+        name: str,
+        tool_input: dict[str, Any],
+        on_status: Callable[[str], None] | None = None,
+    ) -> dict:
         logger.debug("Tool call: %s | input: %s", name, json.dumps(tool_input)[:200])
+
+        _status_labels = {
+            "get_schema": "Reading database schema...",
+            "submit_sql_query": "Generating SQL query...",
+            "validate_sql": "Validating query...",
+            "execute_sql": "Executing query...",
+            "format_results": "Formatting results...",
+            "recover_from_error": "Recovering from error...",
+            "recall_context": "Checking conversation history...",
+        }
+        if on_status and name in _status_labels:
+            on_status(_status_labels[name])
 
         if name == "get_schema":
             return get_schema(
@@ -136,17 +153,8 @@ class TextToSQLAgent:
         self,
         user_query: str,
         conversation_history: list[dict] | None = None,
+        on_status: Callable[[str], None] | None = None,
     ) -> str:
-        """
-        Convert a natural language query to SQL and return a formatted answer.
-
-        Args:
-            user_query: The user's natural language question.
-            conversation_history: Optional list of prior messages for multi-turn support.
-
-        Returns:
-            A formatted string answer.
-        """
         self._turn += 1
         messages: list[dict] = list(conversation_history or [])
         messages.append({"role": "user", "content": user_query})
@@ -155,6 +163,8 @@ class TextToSQLAgent:
         final_text = ""
 
         for iteration in range(20):  # safety cap on loop iterations
+            if on_status:
+                on_status("Thinking...")
             response = self._provider.chat(
                 messages=messages,
                 tools=ALL_TOOLS,
@@ -187,7 +197,7 @@ class TextToSQLAgent:
             # Execute all tool calls and collect results
             tool_results: list[dict] = []
             for tu in response.tool_uses:
-                result = self._execute_tool(tu.name, tu.input)
+                result = self._execute_tool(tu.name, tu.input, on_status=on_status)
                 tool_results.append({
                     "type": "tool_result",
                     "tool_use_id": tu.id,

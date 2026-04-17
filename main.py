@@ -29,9 +29,10 @@ logging.basicConfig(
 
 
 def run_query(agent, query: str, history: list[dict]) -> str:
-    with console.status("[bold cyan]Thinking...[/bold cyan]"):
-        answer = agent.run(query, conversation_history=history)
-    return answer
+    def show_status(msg: str) -> None:
+        console.print(f"[dim cyan]  › {msg}[/dim cyan]")
+
+    return agent.run(query, conversation_history=history, on_status=show_status)
 
 
 def main() -> None:
