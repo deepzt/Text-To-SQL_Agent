@@ -31,8 +31,8 @@ TOOL_DEFINITION = {
             "sql": {"type": "string", "description": "The SQL to validate."},
             "dialect": {
                 "type": "string",
-                "enum": ["sqlite", "postgres", "mysql", "ansi"],
-                "description": "SQL dialect to validate against.",
+                "enum": ["sqlite", "postgres", "mysql", "tsql"],
+                "description": "SQL dialect to validate against. Use 'tsql' for SQL Server.",
                 "default": "sqlite",
             },
         },
@@ -82,6 +82,9 @@ def validate_sql(
     except sqlglot.errors.ParseError as exc:
         issues.append(f"Syntax error: {exc}")
         return {"valid": False, "severity": "error", "issues": issues}
+    except ValueError:
+        # Unknown dialect — retry without one rather than crashing
+        parsed = sqlglot.parse(sql)
 
     # 2. Safety check
     if not allow_write and _WRITE_PATTERNS.match(sql.strip()):
