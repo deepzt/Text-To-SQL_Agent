@@ -4,7 +4,7 @@ import re
 import time
 import urllib.parse
 
-from sqlalchemy import create_engine, inspect, text
+from sqlalchemy import create_engine, text
 
 from .sqlite_adapter import ColumnInfo, QueryResult, TableInfo
 
@@ -52,40 +52,73 @@ class MSSQLAdapter:
             )
 
     def get_schema(self, tables: list[str] | None = None) -> list[TableInfo]:
-        inspector = inspect(self._engine)
-        # SQL Server organises tables under schemas; default to 'dbo'
-        all_tables = inspector.get_table_names(schema="dbo")
-        target = tables if tables else all_tables
+        with self._engine.connect() as conn:
+            # Tables
+            rows = conn.execute(text(
+                "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES "
+                "WHERE TABLE_TYPE = 'BASE TABLE' ORDER BY TABLE_NAME"
+            )).fetchall()
+            all_tables = [r[0] for r in rows]
+            target = tables if tables else all_tables
+
+            # Primary keys per table
+            pk_rows = conn.execute(text(
+                "SELECT ku.TABLE_NAME, ku.COLUMN_NAME "
+                "FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS tc "
+                "JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE ku "
+                "  ON tc.CONSTRAINT_NAME = ku.CONSTRAINT_NAME "
+                "  AND tc.TABLE_SCHEMA = ku.TABLE_SCHEMA "
+                "WHERE tc.CONSTRAINT_TYPE = 'PRIMARY KEY'"
+            )).fetchall()
+            pk_map: dict[str, set[str]] = {}
+            for tname, col in pk_rows:
+                pk_map.setdefault(tname, set()).add(col)
+
+            # Foreign keys per table
+            fk_rows = conn.execute(text(
+                "SELECT "
+                "  fk.TABLE_NAME, fk.COLUMN_NAME, "
+                "  pk.TABLE_NAME AS REF_TABLE, pk.COLUMN_NAME AS REF_COLUMN "
+                "FROM INFORMATION_SCHEMA.REFERENTIAL_CONSTRAINTS rc "
+                "JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE fk "
+                "  ON rc.CONSTRAINT_NAME = fk.CONSTRAINT_NAME "
+                "JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE pk "
+                "  ON rc.UNIQUE_CONSTRAINT_NAME = pk.CONSTRAINT_NAME "
+                "  AND fk.ORDINAL_POSITION = pk.ORDINAL_POSITION"
+            )).fetchall()
+            fk_map: dict[str, list[dict]] = {}
+            for tname, col, ref_table, ref_col in fk_rows:
+                fk_map.setdefault(tname, []).append({
+                    "columns": [col],
+                    "references": f"{ref_table}.{ref_col}",
+                })
+
+            # Columns per table
+            col_rows = conn.execute(text(
+                "SELECT TABLE_NAME, COLUMN_NAME, DATA_TYPE, IS_NULLABLE "
+                "FROM INFORMATION_SCHEMA.COLUMNS "
+                "ORDER BY TABLE_NAME, ORDINAL_POSITION"
+            )).fetchall()
+            col_map: dict[str, list[ColumnInfo]] = {}
+            for tname, cname, dtype, nullable in col_rows:
+                col_map.setdefault(tname, []).append(
+                    ColumnInfo(
+                        name=cname,
+                        type=dtype,
+                        nullable=(nullable == "YES"),
+                        primary_key=(cname in pk_map.get(tname, set())),
+                    )
+                )
 
         schema: list[TableInfo] = []
         for table_name in target:
             if table_name not in all_tables:
                 continue
-            pk_constraint = inspector.get_pk_constraint(table_name, schema="dbo")
-            pk_cols: set[str] = set(pk_constraint.get("constrained_columns", []))
-            columns_raw = inspector.get_columns(table_name, schema="dbo")
-            columns = [
-                ColumnInfo(
-                    name=col["name"],
-                    type=str(col["type"]),
-                    nullable=col.get("nullable", True),
-                    primary_key=col["name"] in pk_cols,
-                )
-                for col in columns_raw
-            ]
-            fk_raw = inspector.get_foreign_keys(table_name, schema="dbo")
-            foreign_keys = [
-                {
-                    "columns": fk["constrained_columns"],
-                    "references": f"{fk['referred_table']}.{fk['referred_columns']}",
-                }
-                for fk in fk_raw
-            ]
             schema.append(
                 TableInfo(
                     name=table_name,
-                    columns=columns,
-                    foreign_keys=foreign_keys,
+                    columns=col_map.get(table_name, []),
+                    foreign_keys=fk_map.get(table_name, []),
                 )
             )
         return schema
