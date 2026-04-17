@@ -47,6 +47,8 @@ class _Display:
         elif msg.startswith("validation_result\n"):
             payload = json.loads(msg[len("validation_result\n"):])
             self._render_validation(payload)
+        elif msg.startswith("error\n"):
+            console.print(f"[bold red]  ✗ Error:[/bold red] [red]{msg[6:]}[/red]")
         else:
             console.print(f"[dim cyan]  › {msg}[/dim cyan]")
 

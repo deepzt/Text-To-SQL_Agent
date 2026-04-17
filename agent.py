@@ -140,6 +140,8 @@ class TextToSQLAgent:
             attempt = tool_input["attempt_number"]
             key = failing_sql[:100]
             self._error_attempts[key] = self._error_attempts.get(key, 0) + 1
+            if on_status and tool_input.get("error_message"):
+                on_status("error\n" + tool_input["error_message"])
             return recover_from_error(
                 provider=self._provider,
                 schema_text=schema_to_text(self._db),
