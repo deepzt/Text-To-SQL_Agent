@@ -54,14 +54,16 @@ class TextToSQLAgent:
             "Your job is to convert natural language questions into accurate SQL queries "
             "and return the results in a clear, human-readable format.\n\n"
             "Rules:\n"
-            "1. Always call get_schema first if you don't already have the schema in context.\n"
-            "2. Use submit_sql_query to commit to your generated SQL — never execute SQL directly.\n"
-            "3. For low/medium confidence queries, call validate_sql before execute_sql.\n"
+            "1. The full database schema is already provided below — do NOT call get_schema "
+            "   unless the user explicitly asks to refresh the schema.\n"
+            "2. Use submit_sql_query to hand off your generated SQL — never execute SQL directly.\n"
+            "3. Call validate_sql only for complex or uncertain queries.\n"
             "4. Always call format_results as the final step before answering.\n"
             "5. If execute_sql returns an error, call recover_from_error immediately.\n"
             "6. Only generate SELECT queries unless the user explicitly requests writes "
             "   AND write mode is enabled.\n"
-            "7. Use recall_context to reference previous queries in multi-turn conversations.\n\n"
+            "7. Use recall_context to reference previous queries in multi-turn conversations.\n"
+            "8. Be concise. Answer directly — do not over-explain.\n\n"
             f"{schema_text}"
         )
 
@@ -169,7 +171,7 @@ class TextToSQLAgent:
                 messages=messages,
                 tools=ALL_TOOLS,
                 system=system,
-                max_tokens=16000,
+                max_tokens=4096,
             )
 
             if response.stop_reason == "end_turn" and not response.tool_uses:
