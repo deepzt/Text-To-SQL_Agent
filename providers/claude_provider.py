@@ -43,13 +43,19 @@ class ClaudeProvider(LLMProvider):
         )
         if self.supports_thinking:
             kwargs["thinking"] = {"type": "adaptive", "budget_tokens": 8000}
+            kwargs["betas"] = ["interleaved-thinking-2025-05-14"]
 
         text_parts: list[str] = []
         tool_uses: list[ToolUseBlock] = []
 
+        # Use beta client when interleaved-thinking beta is active
+        _msg_client = self._client.beta.messages if "betas" in kwargs else self._client.messages
+        _betas = kwargs.pop("betas", None)
+
         if on_thinking:
             # Raw event iteration — surfaces both thinking and text deltas separately
-            with self._client.messages.stream(**kwargs) as stream:
+            stream_kwargs = {**kwargs, **({"betas": _betas} if _betas else {})}
+            with _msg_client.stream(**stream_kwargs) as stream:
                 for event in stream:
                     if event.type == "content_block_delta":
                         delta = event.delta
@@ -59,12 +65,14 @@ class ClaudeProvider(LLMProvider):
                             on_token(delta.text)
             response = stream.get_final_message()
         elif on_token:
-            with self._client.messages.stream(**kwargs) as stream:
+            stream_kwargs = {**kwargs, **({"betas": _betas} if _betas else {})}
+            with _msg_client.stream(**stream_kwargs) as stream:
                 for text in stream.text_stream:
                     on_token(text)
             response = stream.get_final_message()
         else:
-            response = self._client.messages.create(**kwargs)
+            create_kwargs = {**kwargs, **({"betas": _betas} if _betas else {})}
+            response = _msg_client.create(**create_kwargs)
 
         for block in response.content:
             if block.type == "text":

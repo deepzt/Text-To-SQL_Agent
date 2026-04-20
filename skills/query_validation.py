@@ -81,8 +81,15 @@ def validate_sql(
         if not parsed:
             issues.append("Syntax error: empty parse result.")
     except ParseError as exc:
-        issues.append(f"Syntax error: {exc}")
-        return {"valid": False, "severity": "error", "issues": issues}
+        # Dialect mismatch (e.g. tsql brackets parsed as sqlite) — retry without dialect
+        try:
+            parsed = sqlglot.parse(sql)
+            if not parsed:
+                issues.append(f"Syntax error: {exc}")
+                return {"valid": False, "severity": "error", "issues": issues}
+        except ParseError:
+            issues.append(f"Syntax error: {exc}")
+            return {"valid": False, "severity": "error", "issues": issues}
     except ValueError:
         # Unknown dialect — retry without one rather than crashing
         parsed = sqlglot.parse(sql)
@@ -104,7 +111,7 @@ def validate_sql(
     if known_tables and parsed:
         for statement in filter(None, parsed):
             for table_node in statement.find_all(exp.Table):
-                tname = table_node.name
+                tname = (table_node.name or "").strip('[]`"\'')
                 if tname and tname.lower() not in [t.lower() for t in known_tables]:
                     issues.append(f"Unknown table referenced: '{tname}'")
 

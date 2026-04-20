@@ -114,7 +114,7 @@ class TextToSQLAgent:
             known_tables = [t["table"] for t in schema_result.get("schema", [])]
             result = validate_sql(
                 sql=tool_input["sql"],
-                dialect=tool_input.get("dialect", "sqlite"),
+                dialect=tool_input.get("dialect", Config.SQL_DIALECT),
                 allow_write=Config.ALLOW_WRITE_QUERIES,
                 known_tables=known_tables,
             )

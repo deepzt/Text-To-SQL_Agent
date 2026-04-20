@@ -29,6 +29,11 @@ class Config:
     # Raw ODBC connection string for SQL Server
     # e.g. DRIVER={SQL Server};SERVER=host,port;DATABASE=db;UID=user;PWD=pass
     MSSQL_CONNECTION_STRING: str = os.getenv("MSSQL_CONNECTION_STRING", "")
+    # Auto-detected SQL dialect for validation — override via SQL_DIALECT env var
+    SQL_DIALECT: str = os.getenv(
+        "SQL_DIALECT",
+        "tsql" if os.getenv("MSSQL_CONNECTION_STRING") else "sqlite",
+    )
 
     # Agent behaviour
     MAX_ROWS_RETURNED: int = int(os.getenv("MAX_ROWS_RETURNED", "100"))
