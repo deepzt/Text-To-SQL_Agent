@@ -94,20 +94,24 @@ def get_schema(db, tables: list[str] | None = None, refresh: bool = False) -> di
     return {"schema": schema_list, "table_count": len(schema_list)}
 
 
-def schema_to_text(db) -> str:
+def schema_to_text(db, dialect: str = "sqlite") -> str:
     """Return a compact text representation of the full schema for system prompts."""
     result = get_schema(db)
+
+    def quote(name: str) -> str:
+        return f"[{name}]" if dialect == "tsql" else name
+
     lines: list[str] = ["DATABASE SCHEMA:"]
     for t in result["schema"]:
-        lines.append(f"\nTable: {t['table']}")
+        lines.append(f"\nTable: {quote(t['table'])}")
         for col in t["columns"]:
             flags = []
             if col["primary_key"]:
                 flags.append("PK")
             if not col["nullable"]:
                 flags.append("NOT NULL")
-            flag_str = f" [{', '.join(flags)}]" if flags else ""
-            lines.append(f"  - {col['name']} ({col['type']}){flag_str}")
+            flag_str = f" ({', '.join(flags)})" if flags else ""
+            lines.append(f"  - {quote(col['name'])} ({col['type']}){flag_str}")
         if t.get("foreign_keys"):
             for fk in t["foreign_keys"]:
                 lines.append(f"  FK: {fk['columns']} → {fk['references']}")

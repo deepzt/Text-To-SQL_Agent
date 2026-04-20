@@ -48,7 +48,7 @@ class TextToSQLAgent:
     # ── System prompt ─────────────────────────────────────────────────────────
 
     def _build_system_prompt(self) -> str:
-        schema_text = schema_to_text(self._db)
+        schema_text = schema_to_text(self._db, dialect=Config.SQL_DIALECT)
         return (
             "You are an expert SQL assistant. "
             "Your job is to convert natural language questions into accurate SQL queries "
